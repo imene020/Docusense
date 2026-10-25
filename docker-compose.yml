@@ -1,0 +1,73 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["80:80"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [backend, frontend]
+
+  frontend:
+    build: ./frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=/api
+    expose: ["3000"]
+
+  backend:
+    build: ./backend
+    env_file: .env
+    expose: ["8000"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - upload_data:/data/uploads
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+      qdrant: { condition: service_started }
+
+  worker:
+    build: ./backend
+    command: celery -A app.workers.celery_app.celery worker --loglevel=info --concurrency=2
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - upload_data:/data/uploads
+    depends_on: [backend, redis, qdrant, postgres]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: docusense
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docusense}
+      POSTGRES_DB: docusense
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docusense"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    volumes:
+      - qdrant_data:/qdrant/storage
+    expose: ["6333"]
+
+  # Ollama runs on a remote GPU host in production (OLLAMA_BASE_URL in .env).
+  # Uncomment below to run it locally instead.
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   volumes: [ollama_data:/root/.ollama]
+  #   expose: ["11434"]
+
+volumes:
+  pg_data:
+  redis_data:
+  qdrant_data:
+  upload_data:

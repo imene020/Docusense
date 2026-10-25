@@ -1,0 +1,35 @@
+# Render Blueprint — deploys the DocuSense API as a free Docker web service.
+# Secrets marked `sync: false` are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: docusense-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile   # paths are relative to the repo root
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: INGEST_MODE
+        value: inline
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+      - key: LLM_PROVIDER
+        value: openai
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: llama-3.1-8b-instant
+      - key: LLM_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
